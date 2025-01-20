@@ -23,7 +23,9 @@ type Config struct {
 
 // NewConfig returns a new default remote configuration.
 func NewConfig() Config {
-	return Config{}
+	return Config{
+		MaxRetries: 3,
+	}
 }
 
 // WithTLS sets the TLS config of the remote which will set
