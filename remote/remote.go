@@ -16,7 +16,8 @@ import (
 
 // Config holds the remote configuration.
 type Config struct {
-	TLSConfig *tls.Config
+	TLSConfig  *tls.Config
+	MaxRetries uint
 	// Wg        *sync.WaitGroup
 }
 
@@ -29,6 +30,11 @@ func NewConfig() Config {
 // the transport of the Remote to TLS.
 func (c Config) WithTLS(tlsconf *tls.Config) Config {
 	c.TLSConfig = tlsconf
+	return c
+}
+
+func (c Config) WithMaxRetries(maxRetries uint) Config {
+	c.MaxRetries = maxRetries
 	return c
 }
 
@@ -86,7 +92,7 @@ func (r *Remote) Start(e *actor.Engine) error {
 	s := drpcserver.New(mux)
 
 	r.streamRouterPID = r.engine.Spawn(
-		newStreamRouter(r.engine, r.config.TLSConfig),
+		newStreamRouter(r.engine, r.config),
 		"router", actor.WithInboxSize(1024*1024))
 	slog.Debug("server started", "listenAddr", r.addr)
 	r.stopWg = &sync.WaitGroup{}

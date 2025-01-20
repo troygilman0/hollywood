@@ -29,10 +29,10 @@ type streamWriter struct {
 	pid         *actor.PID
 	inbox       actor.Inboxer
 	serializer  Serializer
-	tlsConfig   *tls.Config
+	Config
 }
 
-func newStreamWriter(e *actor.Engine, rpid *actor.PID, address string, tlsConfig *tls.Config) actor.Processer {
+func newStreamWriter(e *actor.Engine, rpid *actor.PID, address string, config Config) actor.Processer {
 	return &streamWriter{
 		writeToAddr: address,
 		engine:      e,
@@ -40,7 +40,7 @@ func newStreamWriter(e *actor.Engine, rpid *actor.PID, address string, tlsConfig
 		inbox:       actor.NewInbox(streamWriterBatchSize),
 		pid:         actor.NewPID(e.Address(), "stream"+"/"+address),
 		serializer:  ProtoSerializer{},
-		tlsConfig:   tlsConfig,
+		Config:      config,
 	}
 }
 
@@ -110,28 +110,27 @@ func (s *streamWriter) Invoke(msgs []actor.Envelope) {
 
 func (s *streamWriter) init() {
 	var (
-		rawconn    net.Conn
-		err        error
-		delay      time.Duration = time.Millisecond * 500
-		maxRetries               = 3
+		rawconn net.Conn
+		err     error
+		delay   time.Duration = time.Millisecond * 500
 	)
-	for i := 0; i < maxRetries; i++ {
+	for i := 0; i < int(s.MaxRetries); i++ {
 		// Here we try to connect to the remote address.
-		switch s.tlsConfig {
+		switch s.TLSConfig {
 		case nil:
 			rawconn, err = net.Dial("tcp", s.writeToAddr)
 			if err != nil {
 				d := time.Duration(delay * time.Duration(i*2))
-				slog.Error("net.Dial", "err", err, "remote", s.writeToAddr, "retry", i, "max", maxRetries, "delay", d)
+				slog.Error("net.Dial", "err", err, "remote", s.writeToAddr, "retry", i, "max", s.MaxRetries, "delay", d)
 				time.Sleep(d)
 				continue
 			}
 		default:
 			slog.Debug("remote using TLS for writing")
-			rawconn, err = tls.Dial("tcp", s.writeToAddr, s.tlsConfig)
+			rawconn, err = tls.Dial("tcp", s.writeToAddr, s.TLSConfig)
 			if err != nil {
 				d := time.Duration(delay * time.Duration(i*2))
-				slog.Error("tls.Dial", "err", err, "remote", s.writeToAddr, "retry", i, "max", maxRetries, "delay", d)
+				slog.Error("tls.Dial", "err", err, "remote", s.writeToAddr, "retry", i, "max", s.MaxRetries, "delay", d)
 				time.Sleep(d)
 				continue
 			}
